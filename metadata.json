@@ -1,0 +1,7 @@
+{
+  "name": "CharacterScene Studio",
+  "description": "An AI-powered studio to create, manage, and reuse characters in various scenes. Generate consistent characters, build scenes, edit images with text, and create videos from photos.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
