@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { Canvas } from './components/Canvas';
 import { ControlsPanel } from './components/ControlsPanel';
 import { CharacterCreatorModal } from './components/CharacterCreatorModal';
+import { downloadJson } from './utils/fileUtils';
 
 function App() {
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -16,6 +17,9 @@ function App() {
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([]);
   const [scenePrompt, setScenePrompt] = useState('Two characters having a picnic in a sunny park.');
   const [sceneSoundEffect, setSceneSoundEffect] = useState<SoundEffect | undefined>(undefined);
+  
+  // Track the currently loaded scene ID to allow updates instead of just creates
+  const [currentSceneId, setCurrentSceneId] = useState<string | null>(null);
   
   const [characterRotations, setCharacterRotations] = useState<Record<string, number>>({});
   const [characterPositions, setCharacterPositions] = useState<Record<string, { x: number; y: number }>>({});
@@ -32,6 +36,7 @@ function App() {
   const selectedCharacterIdsRef = useRef(selectedCharacterIds);
   const characterRotationsRef = useRef(characterRotations);
   const characterPositionsRef = useRef(characterPositions);
+  const sceneSoundEffectRef = useRef(sceneSoundEffect);
 
   // Sync refs with state
   useEffect(() => {
@@ -49,6 +54,10 @@ function App() {
   useEffect(() => {
     characterPositionsRef.current = characterPositions;
   }, [characterPositions]);
+
+  useEffect(() => {
+    sceneSoundEffectRef.current = sceneSoundEffect;
+  }, [sceneSoundEffect]);
 
 
   // Load from LocalStorage
@@ -75,6 +84,7 @@ function App() {
         if (parsed.characterIds) setSelectedCharacterIds(parsed.characterIds);
         if (parsed.rotations) setCharacterRotations(parsed.rotations);
         if (parsed.positions) setCharacterPositions(parsed.positions);
+        if (parsed.soundEffect) setSceneSoundEffect(parsed.soundEffect);
       }
     } catch (e) {
       console.error("Failed to load from local storage", e);
@@ -89,6 +99,7 @@ function App() {
         characterIds: selectedCharacterIdsRef.current,
         rotations: characterRotationsRef.current,
         positions: characterPositionsRef.current,
+        soundEffect: sceneSoundEffectRef.current,
         timestamp: Date.now()
       };
       localStorage.setItem('css_autosave', JSON.stringify(dataToSave));
@@ -138,19 +149,68 @@ function App() {
     setCharacters(prev => [...prev, character]);
     setIsCreatorModalOpen(false);
   };
+  
+  const handleImportCharacter = (character: Character) => {
+    // Avoid duplicates by ID
+    if (!characters.some(c => c.id === character.id)) {
+        setCharacters(prev => [...prev, character]);
+    } else {
+        setCharacters(prev => prev.map(c => c.id === character.id ? character : c));
+    }
+  };
+
+  const handleImportLibrary = (newCharacters: Character[]) => {
+     setCharacters(prev => {
+         const combined = [...prev];
+         newCharacters.forEach(newChar => {
+             const existingIndex = combined.findIndex(c => c.id === newChar.id);
+             if (existingIndex >= 0) {
+                 combined[existingIndex] = newChar; // Update existing
+             } else {
+                 combined.push(newChar); // Add new
+             }
+         });
+         return combined;
+     });
+  };
+
+  const handleDeleteCharacter = (id: string) => {
+    setCharacters(prev => prev.filter(c => c.id !== id));
+    setSelectedCharacterIds(prev => prev.filter(cid => cid !== id));
+  };
 
   const handleSaveScene = (name: string) => {
-    const newScene: Scene = {
-      id: crypto.randomUUID(),
-      name,
-      characterIds: selectedCharacterIds,
-      prompt: scenePrompt,
-      createdAt: Date.now(),
-      soundEffect: sceneSoundEffect,
-      rotations: characterRotations,
-      positions: characterPositions
-    };
-    setScenes(prev => [newScene, ...prev]);
+    const existingScene = scenes.find(s => s.id === currentSceneId);
+
+    // If we are working on an existing scene and the name hasn't changed (or user wants to update it),
+    // we update the existing record. If the name is different, it implies a "Save As" intent.
+    if (existingScene && existingScene.name === name) {
+        const updatedScene: Scene = {
+            ...existingScene,
+            characterIds: selectedCharacterIds,
+            prompt: scenePrompt,
+            soundEffect: sceneSoundEffect,
+            rotations: characterRotations,
+            positions: characterPositions,
+            generatedContent: generatedContent || undefined,
+        };
+        setScenes(prev => prev.map(s => s.id === currentSceneId ? updatedScene : s));
+    } else {
+        // Create a new scene
+        const newScene: Scene = {
+            id: crypto.randomUUID(),
+            name,
+            characterIds: selectedCharacterIds,
+            prompt: scenePrompt,
+            createdAt: Date.now(),
+            soundEffect: sceneSoundEffect,
+            rotations: characterRotations,
+            positions: characterPositions,
+            generatedContent: generatedContent || undefined,
+        };
+        setScenes(prev => [newScene, ...prev]);
+        setCurrentSceneId(newScene.id);
+    }
   };
 
   const handleLoadScene = (scene: Scene) => {
@@ -160,13 +220,56 @@ function App() {
     setCharacterRotations(scene.rotations || {});
     setCharacterPositions(scene.positions || {});
     
-    setGeneratedContent(null); 
+    // Load generated content if available, otherwise clear it
+    setGeneratedContent(scene.generatedContent || null);
+    
+    // Set the current scene ID so we can update it later
+    setCurrentSceneId(scene.id);
     
     setActiveTool('SCENE_BUILDER');
+  };
+  
+  const handleImportScene = (scene: Scene) => {
+    if (!scenes.some(s => s.id === scene.id)) {
+        setScenes(prev => [scene, ...prev]);
+    } else {
+        setScenes(prev => prev.map(s => s.id === scene.id ? scene : s));
+    }
+  };
+
+  const handleExportScene = () => {
+    const exportName = currentSceneName || "Untitled Scene";
+    const sceneData: Scene = {
+      id: currentSceneId || crypto.randomUUID(),
+      name: exportName,
+      characterIds: selectedCharacterIds,
+      prompt: scenePrompt,
+      createdAt: Date.now(),
+      soundEffect: sceneSoundEffect,
+      rotations: characterRotations,
+      positions: characterPositions,
+      generatedContent: generatedContent || undefined
+    };
+    
+    downloadJson(sceneData, `scene-${exportName.replace(/\s+/g, '_')}.json`);
   };
 
   const handleDeleteScene = (id: string) => {
     setScenes(prev => prev.filter(s => s.id !== id));
+    if (currentSceneId === id) {
+        setCurrentSceneId(null);
+    }
+  };
+  
+  const handleResetScene = () => {
+    setSelectedCharacterIds([]);
+    setScenePrompt('Two characters having a picnic in a sunny park.');
+    setSceneSoundEffect(undefined);
+    setCharacterRotations({});
+    setCharacterPositions({});
+    setCurrentSceneId(null);
+    setGeneratedContent(null);
+    setError(null);
   };
   
   // The order of selectedCharacterIds determines the layer order (index 0 is the back).
@@ -174,6 +277,8 @@ function App() {
   const selectedCharacters = selectedCharacterIds
     .map(id => characters.find(c => c.id === id))
     .filter((c): c is Character => c !== undefined);
+  
+  const currentSceneName = scenes.find(s => s.id === currentSceneId)?.name;
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-900">
@@ -184,8 +289,12 @@ function App() {
           selectedCharacterIds={selectedCharacterIds}
           onCharacterSelect={handleCharacterSelect}
           onAddCharacterClick={() => setIsCreatorModalOpen(true)}
+          onImportCharacter={handleImportCharacter}
+          onImportLibrary={handleImportLibrary}
+          onDeleteCharacter={handleDeleteCharacter}
           scenes={scenes}
           onSceneSelect={handleLoadScene}
+          onImportScene={handleImportScene}
           onSceneDelete={handleDeleteScene}
         />
         <Canvas
@@ -209,11 +318,16 @@ function App() {
           scenePrompt={scenePrompt}
           setScenePrompt={setScenePrompt}
           onSaveScene={handleSaveScene}
+          currentSceneName={currentSceneName}
           sceneSoundEffect={sceneSoundEffect}
           setSceneSoundEffect={setSceneSoundEffect}
           soundLibrary={soundLibrary}
           setSoundLibrary={setSoundLibrary}
           characterRotations={characterRotations}
+          onResetScene={handleResetScene}
+          scenes={scenes}
+          onLoadScene={handleLoadScene}
+          onExportScene={handleExportScene}
         />
       </div>
       {isCreatorModalOpen && (
