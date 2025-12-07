@@ -278,6 +278,13 @@ const TransformableCharacter: React.FC<{
         onRotationChange(rotation + degrees);
     };
 
+    const handleManualRotationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = parseInt(e.target.value, 10);
+        if (!isNaN(val)) {
+            onRotationChange(val);
+        }
+    };
+
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
             if (isDragging) {
@@ -368,8 +375,16 @@ const TransformableCharacter: React.FC<{
                 )}
 
                 {isSelected && (
-                    <div className="absolute top-0 right-0 bg-indigo-600 text-white text-[10px] px-1 rounded-bl">
-                        {Math.round(rotation)}°
+                    <div className="absolute top-0 right-0 pointer-events-auto">
+                        <input
+                            type="number"
+                            step={45}
+                            value={Math.round(rotation)}
+                            onChange={handleManualRotationChange}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="w-14 bg-indigo-600 text-white text-xs px-1 py-0.5 rounded-bl border-none focus:outline-none focus:ring-1 focus:ring-white text-center font-mono"
+                            title="Rotation angle (step 45°)"
+                        />
                     </div>
                 )}
             </div>
