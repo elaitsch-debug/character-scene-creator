@@ -18,6 +18,18 @@ interface CanvasProps {
   onPositionChange: (id: string, position: { x: number, y: number }) => void;
 }
 
+const RotateLeftIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+  </svg>
+);
+
+const RotateRightIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="m15 15 6-6m0 0-6-6m6 6H9a6 6 0 0 0 0 12h3" />
+  </svg>
+);
+
 const LayerManager: React.FC<{ 
   characters: Character[]; 
   onReorder: (reordered: Character[]) => void;
@@ -261,6 +273,11 @@ const TransformableCharacter: React.FC<{
         }
     };
 
+    const handleRotateStep = (e: React.MouseEvent, degrees: number) => {
+        e.stopPropagation();
+        onRotationChange(rotation + degrees);
+    };
+
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
             if (isDragging) {
@@ -331,6 +348,25 @@ const TransformableCharacter: React.FC<{
                     </div>
                 )}
                 
+                {isSelected && (
+                    <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 pointer-events-auto">
+                        <button 
+                            onClick={(e) => handleRotateStep(e, -45)}
+                            className="bg-gray-800 text-white p-1.5 rounded-full shadow hover:bg-indigo-600 transition-colors border border-gray-600"
+                            title="Rotate Left 45°"
+                        >
+                            <RotateLeftIcon className="w-4 h-4" />
+                        </button>
+                        <button 
+                            onClick={(e) => handleRotateStep(e, 45)}
+                            className="bg-gray-800 text-white p-1.5 rounded-full shadow hover:bg-indigo-600 transition-colors border border-gray-600"
+                            title="Rotate Right 45°"
+                        >
+                            <RotateRightIcon className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
+
                 {isSelected && (
                     <div className="absolute top-0 right-0 bg-indigo-600 text-white text-[10px] px-1 rounded-bl">
                         {Math.round(rotation)}°

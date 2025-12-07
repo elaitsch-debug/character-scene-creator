@@ -62,7 +62,12 @@ const SceneBuilder: React.FC<Omit<ControlsPanelProps, 'activeTool'>> = ({
     setLoading(true, "Building your scene...");
     setError(null);
     try {
-      const imageUrl = await generateScene(selectedCharacters, scenePrompt, characterRotations);
+      const imageUrl = await generateScene(
+          selectedCharacters, 
+          scenePrompt, 
+          characterRotations, 
+          (msg) => setLoading(true, msg) // Pass progress callback
+      );
       // Wait slightly to ensure state propagation if needed, though usually automatic
       onGenerationComplete({ 
         type: 'image', 
@@ -261,7 +266,8 @@ const ImageGeneratorPanel: React.FC<Pick<ControlsPanelProps, 'setLoading' | 'set
     setLoading(true, "Generating image...");
     setError(null);
     try {
-      const resultUrl = await generateImageFromInput(input);
+      // Pass the progress callback to handle progression_text from JSON input
+      const resultUrl = await generateImageFromInput(input, (msg) => setLoading(true, msg));
       onGenerationComplete({ type: 'image', url: resultUrl });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate image.");

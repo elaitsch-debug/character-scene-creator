@@ -47,7 +47,7 @@ export const generateCharacterImage = async (prompt: string): Promise<string> =>
   throw new Error("Image generation failed.");
 };
 
-export const generateImageFromInput = async (input: string): Promise<string> => {
+export const generateImageFromInput = async (input: string, onProgress?: (message: string) => void): Promise<string> => {
   const ai = getGenAI();
   let prompt = input;
   let outputMimeType = 'image/jpeg';
@@ -60,7 +60,9 @@ export const generateImageFromInput = async (input: string): Promise<string> => 
          prompt += ", transparent background";
          outputMimeType = 'image/png';
       }
-      // progression_text can be logged or used if needed, currently unused in standard generation
+      if (json.progression_text && onProgress) {
+          onProgress(json.progression_text);
+      }
     }
   } catch (e) {
     // Input is not JSON, treat as raw text prompt
@@ -133,8 +135,27 @@ const processCharacterImage = async (base64Str: string, rotation: number = 0, ma
     });
 };
 
-export const generateScene = async (characters: Character[], scenePrompt: string, rotations?: Record<string, number>): Promise<string> => {
+export const generateScene = async (characters: Character[], scenePrompt: string, rotations?: Record<string, number>, onProgress?: (message: string) => void): Promise<string> => {
     const ai = getGenAI();
+    
+    // Parse scenePrompt for JSON Context Profile
+    let finalPrompt = scenePrompt;
+    let explicitTransparent = false;
+    
+    try {
+        const json = JSON.parse(scenePrompt);
+        if (json.prompt) {
+            finalPrompt = json.prompt;
+            if (json.transparent_background) {
+                explicitTransparent = true;
+            }
+            if (json.progression_text && onProgress) {
+                onProgress(json.progression_text);
+            }
+        }
+    } catch (e) {
+        // Not JSON, use original string
+    }
     
     const parts: Part[] = [];
 
@@ -172,7 +193,12 @@ export const generateScene = async (characters: Character[], scenePrompt: string
         layeringInstruction = `Pay close attention to the layering: ${layerDescriptions}. `;
     }
 
-    const fullPrompt = `Create a new scene featuring the ${characters.length} character(s) from the provided image(s). ${layeringInstruction}Scene details: ${scenePrompt}. Maintain the characters' appearance and style as closely as possible.`;
+    let fullPrompt = `Create a new scene featuring the ${characters.length} character(s) from the provided image(s). ${layeringInstruction}Scene details: ${finalPrompt}. Maintain the characters' appearance and style as closely as possible.`;
+    
+    if (explicitTransparent) {
+        fullPrompt += " The background should be transparent or solid white to easily isolate the subjects.";
+    }
+
     parts.push({ text: fullPrompt });
 
     const response = await ai.models.generateContent({
