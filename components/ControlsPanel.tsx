@@ -63,6 +63,7 @@ const SceneBuilder: React.FC<Omit<ControlsPanelProps, 'activeTool'>> = ({
     setError(null);
     try {
       const imageUrl = await generateScene(selectedCharacters, scenePrompt, characterRotations);
+      // Wait slightly to ensure state propagation if needed, though usually automatic
       onGenerationComplete({ 
         type: 'image', 
         url: imageUrl, 

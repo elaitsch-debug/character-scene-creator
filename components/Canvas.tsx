@@ -406,7 +406,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (generatedContent) {
       if (generatedContent.type === 'image') {
         return (
-          <div className="relative group max-w-full max-h-full flex flex-col items-center">
+          <div className="relative group max-w-full max-h-full flex flex-col items-center" key={generatedContent.url}>
             {generatedContent.soundEffectUrl && <AudioPlayer url={generatedContent.soundEffectUrl} />}
             <img src={generatedContent.url} alt="Generated content" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
             <button 
@@ -421,7 +421,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
       if (generatedContent.type === 'video') {
         return (
-          <div className="relative group max-w-full max-h-full flex flex-col items-center">
+          <div className="relative group max-w-full max-h-full flex flex-col items-center" key={generatedContent.url}>
              <video src={generatedContent.url} controls autoPlay loop className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
              <button 
                 onClick={() => downloadMedia(generatedContent.url, 'video')}
@@ -436,7 +436,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (generatedContent.type === 'audio') {
           const character = selectedCharacters.find(c => c.id === generatedContent.characterId) || selectedCharacters[0];
           return (
-              <div className="flex flex-col items-center gap-6 bg-gray-800/80 p-8 rounded-xl border border-gray-700 backdrop-blur-sm max-w-lg w-full relative">
+              <div className="flex flex-col items-center gap-6 bg-gray-800/80 p-8 rounded-xl border border-gray-700 backdrop-blur-sm max-w-lg w-full relative" key={generatedContent.url}>
                   <div className="relative w-48 h-48 rounded-full overflow-hidden border-4 border-indigo-500 shadow-xl">
                       {character ? (
                           <img src={character.imageUrl} alt={character.name} className="w-full h-full object-cover" />
