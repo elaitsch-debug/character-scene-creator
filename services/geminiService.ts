@@ -83,25 +83,50 @@ export const generateImageFromInput = async (input: string): Promise<string> => 
   throw new Error("Image generation failed.");
 };
 
-const rotateImage = async (base64Str: string, rotation: number): Promise<string> => {
-    if (!rotation) return base64Str;
+/**
+ * Resizes and rotates a base64 image.
+ * Resizing to a smaller dimension (default 512px) ensures we can send multiple characters (up to 20)
+ * without hitting API payload limits.
+ */
+const processCharacterImage = async (base64Str: string, rotation: number = 0, maxSize: number = 512): Promise<string> => {
     return new Promise((resolve) => {
         const img = new Image();
         img.src = base64Str;
         img.onload = () => {
             const canvas = document.createElement('canvas');
+            // Calculate dimensions
+            let width = img.width;
+            let height = img.height;
+
+            // Resize logic (maintain aspect ratio)
+            if (width > maxSize || height > maxSize) {
+                const ratio = Math.min(maxSize / width, maxSize / height);
+                width = width * ratio;
+                height = height * ratio;
+            }
+
+            // Rotation dimension calculation
             const rad = (rotation * Math.PI) / 180;
             const sin = Math.abs(Math.sin(rad));
             const cos = Math.abs(Math.cos(rad));
-            canvas.width = img.width * cos + img.height * sin;
-            canvas.height = img.width * sin + img.height * cos;
             
+            // Canvas size must accommodate the rotated image
+            canvas.width = width * cos + height * sin;
+            canvas.height = width * sin + height * cos;
+
             const ctx = canvas.getContext('2d');
             if (!ctx) { resolve(base64Str); return; }
-            
+
+            // High quality scaling
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
             ctx.translate(canvas.width / 2, canvas.height / 2);
             ctx.rotate(rad);
-            ctx.drawImage(img, -img.width / 2, -img.height / 2);
+            // Draw resized image centered
+            ctx.drawImage(img, -width / 2, -height / 2, width, height);
+
+            // Export as PNG to preserve transparency if present
             resolve(canvas.toDataURL('image/png'));
         };
         img.onerror = () => resolve(base64Str);
@@ -116,15 +141,23 @@ export const generateScene = async (characters: Character[], scenePrompt: string
     // Add character images
     for (const character of characters) {
         let imageUrl = character.imageUrl;
-        if (rotations && rotations[character.id]) {
-            imageUrl = await rotateImage(imageUrl, rotations[character.id]);
-        }
+        
+        // Process image: Apply rotation and resize to max 512px to optimize payload size
+        // This allows supporting up to 20 characters in a single request.
+        imageUrl = await processCharacterImage(imageUrl, rotations?.[character.id] || 0, 512);
 
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        const file = new File([blob], "character.png", { type: blob.type });
-        const imagePart = await fileToGenerativePart(file);
-        parts.push(imagePart);
+        // Extract base64 data and mimeType directly from the data URL
+        const matches = imageUrl.match(/^data:(.+);base64,(.+)$/);
+        if (matches) {
+            const mimeType = matches[1];
+            const base64Data = matches[2];
+            parts.push({
+                inlineData: {
+                    data: base64Data,
+                    mimeType: mimeType,
+                },
+            });
+        }
     }
     
     // Add layering instructions to the prompt
@@ -139,7 +172,7 @@ export const generateScene = async (characters: Character[], scenePrompt: string
         layeringInstruction = `Pay close attention to the layering: ${layerDescriptions}. `;
     }
 
-    const fullPrompt = `Create a new scene featuring the character(s) from the provided image(s). ${layeringInstruction}Scene details: ${scenePrompt}. Maintain the characters' appearance and style as closely as possible.`;
+    const fullPrompt = `Create a new scene featuring the ${characters.length} character(s) from the provided image(s). ${layeringInstruction}Scene details: ${scenePrompt}. Maintain the characters' appearance and style as closely as possible.`;
     parts.push({ text: fullPrompt });
 
     const response = await ai.models.generateContent({
