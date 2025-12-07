@@ -2,9 +2,9 @@
 import React, { useState, useCallback } from 'react';
 import { AspectRatio, Character, ToolType, SoundEffect, Scene } from '../types';
 import { Button } from './common/Button';
-import { generateScene, editImage, generateVideo, generateCharacterSpeech } from '../services/geminiService';
+import { generateScene, editImage, generateVideo, generateCharacterSpeech, generateImageFromInput } from '../services/geminiService';
 import { ApiKeySelector } from './ApiKeySelector';
-import { SaveIcon, VOICE_NAMES, UploadIcon, MusicIcon, TrashIcon, FilePlusIcon, ExportIcon } from '../constants';
+import { SaveIcon, VOICE_NAMES, UploadIcon, MusicIcon, TrashIcon, FilePlusIcon, ExportIcon, PhotoIcon } from '../constants';
 import { fileToBase64 } from '../utils/fileUtils';
 
 interface ControlsPanelProps {
@@ -249,6 +249,52 @@ const SceneBuilder: React.FC<Omit<ControlsPanelProps, 'activeTool'>> = ({
             </Button>
         </div>
       </div>
+    </div>
+  );
+};
+
+const ImageGeneratorPanel: React.FC<Pick<ControlsPanelProps, 'setLoading' | 'setError' | 'onGenerationComplete'>> = ({ setLoading, setError, onGenerationComplete }) => {
+  const [input, setInput] = useState('');
+
+  const handleGenerate = async () => {
+    if (!input.trim()) return;
+    setLoading(true, "Generating image...");
+    setError(null);
+    try {
+      const resultUrl = await generateImageFromInput(input);
+      onGenerationComplete({ type: 'image', url: resultUrl });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate image.");
+    } finally {
+      setLoading(false, "");
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full space-y-6">
+      <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <PhotoIcon className="w-6 h-6" /> Image Generator
+      </h2>
+      
+      <div className="flex-grow space-y-4">
+        <p className="text-gray-400 text-sm">
+            Enter a text prompt or paste a JSON configuration object.
+        </p>
+        
+        <div className="flex-grow">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Prompt / JSON Input</label>
+          <textarea
+            className="w-full h-64 p-3 bg-gray-800 border border-gray-700 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-white placeholder-gray-500 resize-none font-mono text-sm"
+            placeholder={'e.g. "A magical forest"\n\nOR\n\n{\n  "prompt": "A magical forest",\n  "transparent_background": true\n}'}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <Button onClick={handleGenerate} disabled={!input.trim()} className="w-full py-3">
+        Generate Image
+      </Button>
     </div>
   );
 };
@@ -514,6 +560,13 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
   return (
     <aside className="w-96 bg-gray-900 border-l border-gray-700 p-6 flex flex-col shadow-xl z-20 overflow-hidden">
       {activeTool === 'SCENE_BUILDER' && <SceneBuilder {...rest} />}
+      {activeTool === 'IMAGE_GENERATOR' && (
+        <ImageGeneratorPanel 
+            setLoading={rest.setLoading} 
+            setError={rest.setError} 
+            onGenerationComplete={rest.onGenerationComplete} 
+        />
+      )}
       {activeTool === 'IMAGE_EDITOR' && (
         <ImageEditor 
             setLoading={rest.setLoading} 

@@ -47,6 +47,42 @@ export const generateCharacterImage = async (prompt: string): Promise<string> =>
   throw new Error("Image generation failed.");
 };
 
+export const generateImageFromInput = async (input: string): Promise<string> => {
+  const ai = getGenAI();
+  let prompt = input;
+  let outputMimeType = 'image/jpeg';
+
+  try {
+    const json = JSON.parse(input);
+    if (json.prompt) {
+      prompt = json.prompt;
+      if (json.transparent_background) {
+         prompt += ", transparent background";
+         outputMimeType = 'image/png';
+      }
+      // progression_text can be logged or used if needed, currently unused in standard generation
+    }
+  } catch (e) {
+    // Input is not JSON, treat as raw text prompt
+  }
+
+  const response = await ai.models.generateImages({
+    model: MODEL_NAMES.IMAGE_GENERATION,
+    prompt,
+    config: {
+      numberOfImages: 1,
+      outputMimeType: outputMimeType,
+      aspectRatio: '1:1',
+    },
+  });
+
+  if (response.generatedImages && response.generatedImages.length > 0) {
+    const base64ImageBytes = response.generatedImages[0].image.imageBytes;
+    return `data:${outputMimeType};base64,${base64ImageBytes}`;
+  }
+  throw new Error("Image generation failed.");
+};
+
 const rotateImage = async (base64Str: string, rotation: number): Promise<string> => {
     if (!rotation) return base64Str;
     return new Promise((resolve) => {

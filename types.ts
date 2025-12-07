@@ -12,7 +12,7 @@ export interface SoundEffect {
   url: string; // base64 data URL
 }
 
-export type ToolType = 'SCENE_BUILDER' | 'IMAGE_EDITOR' | 'VIDEO_GENERATOR' | 'CHARACTER_VOICE';
+export type ToolType = 'SCENE_BUILDER' | 'IMAGE_GENERATOR' | 'IMAGE_EDITOR' | 'VIDEO_GENERATOR' | 'CHARACTER_VOICE';
 
 export type AspectRatio = '16:9' | '9:16';
 
@@ -33,4 +33,10 @@ export interface Scene {
   rotations?: Record<string, number>;
   positions?: Record<string, { x: number; y: number }>;
   generatedContent?: GeneratedContent;
+}
+export interface Window {
+    aistudio?: {
+        hasSelectedApiKey: () => Promise<boolean>;
+        openSelectKey: () => Promise<void>;
+    }
 }
