@@ -2,9 +2,9 @@
 import React, { useState, useCallback } from 'react';
 import { AspectRatio, Character, ToolType, SoundEffect, Scene } from '../types';
 import { Button } from './common/Button';
-import { generateScene, editImage, generateVideo, generateCharacterSpeech, generateImageFromInput } from '../services/geminiService';
+import { generateScene, editImage, generateVideo, generateCharacterSpeech, generateImageFromInput, animateImage } from '../services/geminiService';
 import { ApiKeySelector } from './ApiKeySelector';
-import { SaveIcon, VOICE_NAMES, UploadIcon, MusicIcon, TrashIcon, FilePlusIcon, ExportIcon, PhotoIcon } from '../constants';
+import { SaveIcon, VOICE_NAMES, UploadIcon, MusicIcon, TrashIcon, FilePlusIcon, ExportIcon, PhotoIcon, SparklesIcon } from '../constants';
 import { fileToBase64 } from '../utils/fileUtils';
 
 interface ControlsPanelProps {
@@ -373,6 +373,112 @@ const ImageEditor: React.FC<Pick<ControlsPanelProps, 'setLoading' | 'setError' |
   );
 };
 
+const AnimatePicturePanel: React.FC<Pick<ControlsPanelProps, 'setLoading' | 'setError' | 'onGenerationComplete'>> = ({ setLoading, setError, onGenerationComplete }) => {
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [input, setInput] = useState('');
+  const [keySelected, setKeySelected] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setImageFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!imageFile || !input || !keySelected) return;
+    setLoading(true, "Animating picture...");
+    setError(null);
+    try {
+      const videoUrl = await animateImage(
+          imageFile, 
+          input, 
+          aspectRatio,
+          (msg) => setLoading(true, msg)
+      );
+      onGenerationComplete({ type: 'video', url: videoUrl });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to animate picture.");
+    } finally {
+      setLoading(false, "");
+    }
+  };
+
+  if (!keySelected) {
+      return (
+          <div className="flex flex-col h-full items-center justify-center p-4">
+              <ApiKeySelector onKeySelected={() => setKeySelected(true)} />
+          </div>
+      )
+  }
+
+  return (
+    <div className="flex flex-col h-full space-y-6">
+      <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <SparklesIcon className="w-6 h-6" /> Animate Picture
+      </h2>
+      
+      <div className="flex-grow space-y-6 overflow-y-auto pr-2">
+        <div className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-indigo-500 transition-colors cursor-pointer relative h-48 flex items-center justify-center bg-gray-800/30">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          />
+          {previewUrl ? (
+            <img src={previewUrl} alt="Preview" className="max-h-full max-w-full object-contain rounded" />
+          ) : (
+            <div className="flex flex-col items-center">
+                <UploadIcon className="w-8 h-8 text-gray-400 mb-2" />
+                <p className="text-gray-400">Upload Picture</p>
+             </div>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Prompt / JSON Input</label>
+          <textarea
+            className="w-full h-32 p-3 bg-gray-800 border border-gray-700 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-white placeholder-gray-500 resize-none font-mono text-xs"
+            placeholder={'Describe the motion (e.g. "The water flows")\n\nOR\n\n{\n  "prompt": "The water flows",\n  "progression_text": "Animating the waves..."\n}'}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+          />
+        </div>
+
+         <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Aspect Ratio</label>
+          <div className="flex gap-4">
+            <button
+              onClick={() => setAspectRatio('16:9')}
+              className={`flex-1 py-2 px-2 text-xs rounded-md border ${
+                aspectRatio === '16:9' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              16:9 (Landscape)
+            </button>
+            <button
+              onClick={() => setAspectRatio('9:16')}
+              className={`flex-1 py-2 px-2 text-xs rounded-md border ${
+                aspectRatio === '9:16' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              9:16 (Portrait)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <Button onClick={handleGenerate} disabled={!imageFile || !input} className="w-full py-3">
+        Animate
+      </Button>
+    </div>
+  );
+};
+
 const VideoGenerator: React.FC<Pick<ControlsPanelProps, 'setLoading' | 'setError' | 'onGenerationComplete'>> = ({ setLoading, setError, onGenerationComplete }) => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -568,6 +674,13 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
       {activeTool === 'SCENE_BUILDER' && <SceneBuilder {...rest} />}
       {activeTool === 'IMAGE_GENERATOR' && (
         <ImageGeneratorPanel 
+            setLoading={rest.setLoading} 
+            setError={rest.setError} 
+            onGenerationComplete={rest.onGenerationComplete} 
+        />
+      )}
+      {activeTool === 'ANIMATE_PICTURE' && (
+        <AnimatePicturePanel
             setLoading={rest.setLoading} 
             setError={rest.setError} 
             onGenerationComplete={rest.onGenerationComplete} 

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ToolType } from '../types';
-import { SceneIcon, EditIcon, VideoIcon, MicrophoneIcon, PhotoIcon } from '../constants';
+import { SceneIcon, EditIcon, VideoIcon, MicrophoneIcon, PhotoIcon, SparklesIcon } from '../constants';
 
 interface HeaderProps {
   activeTool: ToolType;
@@ -42,6 +42,12 @@ export const Header: React.FC<HeaderProps> = ({ activeTool, setActiveTool }) => 
             icon={<PhotoIcon className="w-5 h-5" />}
             isActive={activeTool === 'IMAGE_GENERATOR'}
             onClick={() => setActiveTool('IMAGE_GENERATOR')}
+          />
+          <ToolButton
+            label="Animate Picture"
+            icon={<SparklesIcon className="w-5 h-5" />}
+            isActive={activeTool === 'ANIMATE_PICTURE'}
+            onClick={() => setActiveTool('ANIMATE_PICTURE')}
           />
           <ToolButton
             label="Image Editor"

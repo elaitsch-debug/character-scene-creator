@@ -12,7 +12,7 @@ export interface SoundEffect {
   url: string; // base64 data URL
 }
 
-export type ToolType = 'SCENE_BUILDER' | 'IMAGE_GENERATOR' | 'IMAGE_EDITOR' | 'VIDEO_GENERATOR' | 'CHARACTER_VOICE';
+export type ToolType = 'SCENE_BUILDER' | 'IMAGE_GENERATOR' | 'IMAGE_EDITOR' | 'VIDEO_GENERATOR' | 'CHARACTER_VOICE' | 'ANIMATE_PICTURE';
 
 export type AspectRatio = '16:9' | '9:16';
 

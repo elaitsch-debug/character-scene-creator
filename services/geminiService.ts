@@ -318,3 +318,31 @@ export const generateVideo = async (
     const videoBlob = await response.blob();
     return URL.createObjectURL(videoBlob);
 };
+
+export const animateImage = async (
+    imageFile: File,
+    input: string,
+    aspectRatio: AspectRatio,
+    onProgress: (message: string) => void
+): Promise<string> => {
+    let prompt = input;
+    
+    try {
+        const json = JSON.parse(input);
+        if (json.prompt) {
+            prompt = json.prompt;
+            // Handle transparent background compatibility hint
+            if (json.transparent_background) {
+               prompt += ". Keep background solid or simple to easily isolate subjects.";
+            }
+            if (json.progression_text) {
+                onProgress(json.progression_text);
+            }
+        }
+    } catch (e) {
+        // Not JSON, use raw input
+    }
+    
+    // Re-use standard video generation logic but with parsed prompt
+    return generateVideo(imageFile, prompt, aspectRatio, onProgress);
+};
