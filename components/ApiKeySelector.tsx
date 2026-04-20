@@ -11,6 +11,15 @@ export const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({ onKeySelected })
 
   useEffect(() => {
     const checkKey = async () => {
+      const provider = localStorage.getItem('css_api_provider') || 'gemini';
+      const geminiKey = localStorage.getItem('css_gemini_key');
+      const vertexKey = localStorage.getItem('css_vertex_key');
+
+      if ((provider === 'gemini' && geminiKey) || (provider === 'vertex' && vertexKey)) {
+        onKeySelected();
+        return;
+      }
+
       if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
         const hasKey = await window.aistudio.hasSelectedApiKey();
         if (!hasKey) {

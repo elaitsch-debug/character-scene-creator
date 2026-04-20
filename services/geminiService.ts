@@ -6,10 +6,23 @@ import { base64ToUint8Array, createWavBlob } from '../utils/audioUtils';
 import { AspectRatio, Character } from '../types';
 
 const getGenAI = () => {
-  if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set");
+  const provider = localStorage.getItem('css_api_provider') || 'gemini';
+  const geminiKey = localStorage.getItem('css_gemini_key');
+  const vertexKey = localStorage.getItem('css_vertex_key');
+
+  let activeKey = process.env.API_KEY;
+
+  if (provider === 'gemini' && geminiKey) {
+    activeKey = geminiKey;
+  } else if (provider === 'vertex' && vertexKey) {
+    activeKey = vertexKey;
   }
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  if (!activeKey) {
+    throw new Error("API_KEY not configured. Please set it in Settings or environment variables.");
+  }
+  
+  return new GoogleGenAI({ apiKey: activeKey });
 }
 
 /**

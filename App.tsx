@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { Canvas } from './components/Canvas';
 import { ControlsPanel } from './components/ControlsPanel';
 import { CharacterCreatorModal } from './components/CharacterCreatorModal';
+import { SettingsModal } from './components/SettingsModal';
 import { downloadJson } from './utils/fileUtils';
 
 const MAX_CHARACTERS = 8;
@@ -39,6 +40,7 @@ function App() {
   });
 
   const [isCreatorModalOpen, setIsCreatorModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Use refs for autosave to avoid stale closures and unnecessary re-renders
   const scenePromptRef = useRef(scenePrompt);
@@ -282,7 +284,11 @@ function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-900 overflow-hidden">
-      <Header activeTool={activeTool} setActiveTool={setActiveTool} />
+      <Header 
+        activeTool={activeTool} 
+        setActiveTool={setActiveTool} 
+        onSettingsClick={() => setIsSettingsOpen(true)}
+      />
       <div className="flex flex-grow overflow-x-auto overflow-y-hidden custom-scrollbar">
         <Sidebar
           characters={characters}
@@ -345,6 +351,11 @@ function App() {
         <CharacterCreatorModal 
           onClose={() => setIsCreatorModalOpen(false)}
           onSave={handleSaveCharacter}
+        />
+      )}
+      {isSettingsOpen && (
+        <SettingsModal 
+          onClose={() => setIsSettingsOpen(false)}
         />
       )}
     </div>

@@ -1,11 +1,12 @@
 
 import React from 'react';
 import { ToolType } from '../types';
-import { SceneIcon, EditIcon, VideoIcon, MicrophoneIcon, PhotoIcon, SparklesIcon, CodeBracketIcon, AddUserIcon } from '../constants';
+import { SceneIcon, EditIcon, VideoIcon, MicrophoneIcon, PhotoIcon, SparklesIcon, CodeBracketIcon, AddUserIcon, Cog6ToothIcon } from '../constants';
 
 interface HeaderProps {
   activeTool: ToolType;
   setActiveTool: (tool: ToolType) => void;
+  onSettingsClick: () => void;
 }
 
 const ToolButton: React.FC<{
@@ -25,7 +26,7 @@ const ToolButton: React.FC<{
   </button>
 );
 
-export const Header: React.FC<HeaderProps> = ({ activeTool, setActiveTool }) => {
+export const Header: React.FC<HeaderProps> = ({ activeTool, setActiveTool, onSettingsClick }) => {
   return (
     <header className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-4 w-full">
       <div className="max-w-screen-2xl mx-auto flex justify-between items-center">
@@ -79,6 +80,15 @@ export const Header: React.FC<HeaderProps> = ({ activeTool, setActiveTool }) => 
             isActive={activeTool === 'CHARACTER_VOICE'}
             onClick={() => setActiveTool('CHARACTER_VOICE')}
           />
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onSettingsClick}
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-all"
+            title="Settings"
+          >
+            <Cog6ToothIcon className="w-6 h-6" />
+          </button>
         </div>
       </div>
     </header>
