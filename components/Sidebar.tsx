@@ -17,6 +17,7 @@ interface SidebarProps {
   onSceneSelect: (scene: Scene) => void;
   onImportScene: (scene: Scene) => void;
   onSceneDelete: (id: string) => void;
+  maxCapacity?: number;
 }
 
 const CharacterCard: React.FC<{
@@ -30,16 +31,19 @@ const CharacterCard: React.FC<{
     downloadJson(character, `character-${character.name.replace(/\s+/g, '_')}.json`);
   };
 
+  // Use thumbnail if available for lighter library view
+  const displayImage = character.thumbnailUrl || character.imageUrl;
+
   return (
     <div
       onClick={onSelect}
       className={`relative rounded-lg overflow-hidden cursor-pointer border-2 transition-all group ${
-        isSelected ? 'border-indigo-500 scale-105' : 'border-transparent hover:border-indigo-600'
+        isSelected ? 'border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'border-transparent hover:border-indigo-600/50'
       }`}
     >
-      <img src={character.imageUrl} alt={character.name} className="w-full h-auto aspect-square object-cover" />
+      <img src={displayImage} alt={character.name} className="w-full h-auto aspect-square object-cover bg-gray-900" loading="lazy" />
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-2">
-        <p className="text-white font-semibold text-sm truncate pr-6">{character.name}</p>
+        <p className="text-white font-semibold text-[10px] truncate pr-6">{character.name}</p>
       </div>
       <div className="absolute top-1 right-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
@@ -47,14 +51,14 @@ const CharacterCard: React.FC<{
           className="bg-gray-900/80 p-1 rounded-full text-gray-300 hover:text-white"
           title="Export Character"
         >
-          <ExportIcon className="w-3.5 h-3.5" />
+          <ExportIcon className="w-3 h-3" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
           className="bg-gray-900/80 p-1 rounded-full text-gray-300 hover:text-red-400"
           title="Delete Character"
         >
-          <TrashIcon className="w-3.5 h-3.5" />
+          <TrashIcon className="w-3 h-3" />
         </button>
       </div>
     </div>
@@ -74,10 +78,10 @@ const SceneCard: React.FC<{
   return (
     <div className="bg-gray-700/50 rounded-lg p-3 border border-gray-600 hover:bg-gray-700 transition-colors group relative">
       <div onClick={onSelect} className="cursor-pointer">
-        <h4 className="font-semibold text-white text-sm mb-1 pr-6">{scene.name}</h4>
-        <p className="text-xs text-gray-400 line-clamp-2 italic">"{scene.prompt}"</p>
-        <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-           <span className="bg-gray-800 px-1.5 py-0.5 rounded">{scene.characterIds.length} chars</span>
+        <h4 className="font-semibold text-white text-sm mb-1 pr-6 truncate">{scene.name}</h4>
+        <p className="text-[10px] text-gray-400 line-clamp-2 italic">"{scene.prompt}"</p>
+        <div className="mt-2 flex items-center gap-2 text-[10px] text-gray-500">
+           <span className="bg-gray-800 px-1.5 py-0.5 rounded">{scene.characterIds?.length || 0} chars</span>
            <span>{new Date(scene.createdAt).toLocaleDateString()}</span>
         </div>
       </div>
@@ -112,7 +116,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   scenes,
   onSceneSelect,
   onImportScene,
-  onSceneDelete
+  onSceneDelete,
+  maxCapacity = 8
 }) => {
   const [activeTab, setActiveTab] = useState<'CHARACTERS' | 'SCENES'>('CHARACTERS');
 
@@ -127,10 +132,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           const data = await readJsonFile(file);
           if (type === 'character') {
              if (Array.isArray(data)) {
-                 // Library Import
                  onImportLibrary(data);
              } else if (data.id && data.name && data.imageUrl) {
-                 // Single Character Import
                  onImportCharacter(data);
              } else {
                 alert("Invalid character file.");
@@ -143,7 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
              }
           }
         } catch (err) {
-          console.error("Failed to parse file", err);
+          console.error("Import failed", err);
           alert("Failed to read file.");
         }
       }
@@ -156,9 +159,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       downloadJson(characters, 'character_library.json');
   };
 
+  const atCapacity = characters.length >= maxCapacity;
+
   return (
-    <aside className="w-64 bg-gray-800/50 flex flex-col border-r border-gray-700">
-      {/* Tabs */}
+    <aside className="w-64 flex-shrink-0 bg-gray-800/50 flex flex-col border-r border-gray-700">
       <div className="flex border-b border-gray-700">
         <button
           onClick={() => setActiveTab('CHARACTERS')}
@@ -180,29 +184,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-      <div className="flex-grow overflow-y-auto p-4">
+      <div className="flex-grow overflow-y-auto p-4 custom-scrollbar">
         {activeTab === 'CHARACTERS' ? (
           <>
-            <div className="flex gap-2 mb-4">
-              <Button onClick={onAddCharacterClick} className="flex-1 text-xs px-2">
-                <AddUserIcon className="w-4 h-4" /> New
-              </Button>
-              <div className="flex gap-1">
-                <Button onClick={() => handleImportClick('character')} variant="secondary" className="px-2" title="Import Character(s)">
-                    <ImportIcon className="w-4 h-4" />
+            <div className="flex flex-col gap-3 mb-4">
+              <div className="flex justify-between items-center px-1">
+                 <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Capacity</span>
+                 <span className={`text-[10px] font-bold ${atCapacity ? 'text-orange-400' : 'text-indigo-400'}`}>
+                    {characters.length} / {maxCapacity}
+                 </span>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                    onClick={onAddCharacterClick} 
+                    disabled={atCapacity}
+                    className={`flex-1 text-xs px-2 ${atCapacity ? 'opacity-50 grayscale' : 'bg-indigo-600 shadow-lg shadow-indigo-500/10'}`}
+                >
+                  <AddUserIcon className="w-4 h-4" /> New
                 </Button>
-                <Button onClick={handleExportLibrary} variant="secondary" className="px-2" title="Export Library" disabled={characters.length === 0}>
-                    <ExportIcon className="w-4 h-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button onClick={() => handleImportClick('character')} disabled={atCapacity} variant="secondary" className="px-2" title="Import Character">
+                      <ImportIcon className="w-4 h-4" />
+                  </Button>
+                  <Button onClick={handleExportLibrary} variant="secondary" className="px-2" title="Export Library" disabled={characters.length === 0}>
+                      <ExportIcon className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
             {characters.length === 0 ? (
-              <div className="text-center text-gray-400 mt-8">
-                <p>Your library is empty.</p>
-                <p className="text-sm">Create or import a character.</p>
+              <div className="text-center text-gray-500 mt-12 py-8 border-2 border-dashed border-gray-700 rounded-xl">
+                <p className="text-xs font-medium">Library is empty</p>
+                <p className="text-[10px] mt-1">Create or import characters</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 pb-8">
                 {characters.map(char => (
                   <CharacterCard
                     key={char.id}
@@ -217,16 +233,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </>
         ) : (
           <>
-             <Button onClick={() => handleImportClick('scene')} variant="secondary" className="w-full mb-4">
+             <Button onClick={() => handleImportClick('scene')} variant="secondary" className="w-full mb-4 text-xs">
                <ImportIcon className="w-4 h-4" /> Import Scene
              </Button>
              {scenes.length === 0 ? (
-               <div className="text-center text-gray-400 mt-8">
-                 <p>No saved scenes.</p>
-                 <p className="text-sm">Save a scene or import one.</p>
+               <div className="text-center text-gray-500 mt-12 py-8 border-2 border-dashed border-gray-700 rounded-xl">
+                 <p className="text-xs font-medium">No saved scenes</p>
+                 <p className="text-[10px] mt-1">Compose and save to list</p>
                </div>
              ) : (
-               <div className="flex flex-col gap-3">
+               <div className="flex flex-col gap-3 pb-8">
                  {scenes.map(scene => (
                    <SceneCard 
                      key={scene.id} 

@@ -1,14 +1,15 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { GeneratedContent, Character } from '../types';
+import { GeneratedContent, Character, EditorState, ToolType } from '../types';
 import { Loader } from './common/Loader';
-import { SceneIcon, MicrophoneIcon, DownloadIcon, CloseIcon, SpeakerIcon, SpeakerXMarkIcon } from '../constants';
+import { SceneIcon, MicrophoneIcon, DownloadIcon, CloseIcon, SpeakerIcon, SpeakerXMarkIcon, CodeBracketIcon, SparklesIcon } from '../constants';
 import { Button } from './common/Button';
 
 interface CanvasProps {
   isLoading: boolean;
   loadingMessage: string;
   generatedContent: GeneratedContent | null;
+  activeTool: ToolType;
+  editorState: EditorState;
   error: string | null;
   selectedCharacters: Character[];
   onCharacterReorder: (reorderedCharacters: Character[]) => void;
@@ -18,554 +19,156 @@ interface CanvasProps {
   onPositionChange: (id: string, position: { x: number, y: number }) => void;
 }
 
-const RotateLeftIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-  </svg>
-);
-
-const RotateRightIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="m15 15 6-6m0 0-6-6m6 6H9a6 6 0 0 0 0 12h3" />
-  </svg>
-);
-
-const LayerManager: React.FC<{ 
-  characters: Character[]; 
-  onReorder: (reordered: Character[]) => void;
-}> = ({ characters, onReorder }) => {
-    const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-
-    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
-        setDraggedItemId(id);
-        e.dataTransfer.effectAllowed = 'move';
-    };
-
-    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-    };
-
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
-        e.preventDefault();
-        if (!draggedItemId || draggedItemId === targetId) return;
-
-        // The UI list is reversed, so we operate on a reversed copy
-        const currentCharacters = [...characters].reverse();
-        const draggedIndex = currentCharacters.findIndex(c => c.id === draggedItemId);
-        const targetIndex = currentCharacters.findIndex(c => c.id === targetId);
-
-        if (draggedIndex === -1 || targetIndex === -1) return;
-
-        const reordered = [...currentCharacters];
-        const [draggedItem] = reordered.splice(draggedIndex, 1);
-        reordered.splice(targetIndex, 0, draggedItem);
-        
-        // Reverse it back to the original order (back-to-front) before calling onReorder
-        onReorder(reordered.reverse());
-        setDraggedItemId(null);
-    };
-    
-    const handleDragEnd = () => {
-        setDraggedItemId(null);
-    };
-
-    if (characters.length <= 1) {
-        return null;
-    }
-
-    return (
-        <div className="absolute bottom-4 right-4 bg-gray-800/80 backdrop-blur-md border border-gray-600 rounded-lg p-3 shadow-lg z-10 w-48">
-            <h4 className="text-xs font-bold uppercase text-gray-400 mb-2">Layers (Top to Bottom)</h4>
-            <div className="space-y-2">
-                {[...characters].reverse().map(char => (
-                    <div
-                        key={char.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, char.id)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, char.id)}
-                        onDragEnd={handleDragEnd}
-                        className={`flex items-center gap-2 p-2 rounded-md cursor-grab transition-all ${draggedItemId === char.id ? 'opacity-50 bg-indigo-500 scale-105' : 'bg-gray-700/50 hover:bg-gray-600/50'}`}
-                    >
-                        <img src={char.imageUrl} alt={char.name} className="w-8 h-8 rounded object-cover" />
-                        <span className="text-sm font-medium text-white truncate">{char.name}</span>
-                    </div>
-                ))}
-            </div>
-             <p className="text-xs text-gray-500 mt-2 text-center">Drag to reorder layers.</p>
-        </div>
-    );
-};
-
-interface ImageDownloadModalProps {
-  imageUrl: string;
-  onClose: () => void;
-}
-
-const ImageDownloadModal: React.FC<ImageDownloadModalProps> = ({ imageUrl, onClose }) => {
-  const [format, setFormat] = useState<'png' | 'jpg'>('png');
-  const [resolution, setResolution] = useState<1 | 2 | 4>(1);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleDownload = async () => {
-    setIsProcessing(true);
-    try {
-        const img = new Image();
-        img.src = imageUrl;
-        await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-        });
-
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth * resolution;
-        canvas.height = img.naturalHeight * resolution;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('Could not get canvas context');
-
-        // Fill background with white for JPG to avoid black transparency
-        if (format === 'jpg') {
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
-        const quality = format === 'jpg' ? 0.95 : undefined;
-        const dataUrl = canvas.toDataURL(mimeType, quality);
-
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const resLabel = resolution === 1 ? 'original' : `${resolution}x`;
-        a.download = `character-studio-${resLabel}-${timestamp}.${format}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        onClose();
-    } catch (e) {
-        console.error("Download failed", e);
-    } finally {
-        setIsProcessing(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-        <div className="bg-gray-800 border border-gray-600 rounded-lg p-6 max-w-sm w-full relative shadow-2xl">
-            <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">
-                <CloseIcon className="w-5 h-5" />
-            </button>
-            
-            <h3 className="text-lg font-bold text-white mb-4">Download Options</h3>
-            
-            <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Format</label>
-                <div className="flex gap-2 bg-gray-900/50 p-1 rounded-lg">
-                    {['png', 'jpg'].map(f => (
-                        <button
-                            key={f}
-                            onClick={() => setFormat(f as 'png' | 'jpg')}
-                            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${format === f ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                        >
-                            {f.toUpperCase()}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Resolution</label>
-                <div className="flex gap-2 bg-gray-900/50 p-1 rounded-lg">
-                    {[1, 2, 4].map(r => (
-                        <button
-                            key={r}
-                            onClick={() => setResolution(r as 1 | 2 | 4)}
-                            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${resolution === r ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                        >
-                            {r === 1 ? 'Original' : `${r}x`}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            <Button onClick={handleDownload} className="w-full" disabled={isProcessing}>
-                {isProcessing ? 'Processing...' : 'Download Image'}
-            </Button>
-        </div>
+const AudioPulse: React.FC = () => (
+    <div className="flex items-center justify-center gap-1 h-8">
+        {[...Array(8)].map((_, i) => (
+            <div key={i} className="w-1 bg-indigo-500 rounded-full animate-bounce" style={{ height: '100%', animationDelay: `${i * 0.1}s` }} />
+        ))}
     </div>
-  );
-};
-
-const AudioPlayer: React.FC<{ url: string }> = ({ url }) => {
-    const audioRef = useRef<HTMLAudioElement>(null);
-    const [isMuted, setIsMuted] = useState(false);
-    
-    // Auto-play attempt on mount
-    useEffect(() => {
-        if (audioRef.current) {
-            audioRef.current.play().catch(e => console.log("Autoplay blocked:", e));
-        }
-    }, [url]);
-
-    const toggleMute = () => {
-        if (audioRef.current) {
-            audioRef.current.muted = !isMuted;
-            setIsMuted(!isMuted);
-        }
-    };
-
-    return (
-        <div className="absolute top-4 left-4 z-20">
-            <audio ref={audioRef} src={url} loop autoPlay muted={isMuted} />
-            <button 
-                onClick={toggleMute}
-                className="bg-gray-900/80 hover:bg-indigo-600 text-white p-2 rounded-full shadow-lg transition-colors border border-gray-700"
-                title={isMuted ? "Unmute Scene Audio" : "Mute Scene Audio"}
-            >
-                {isMuted ? <SpeakerXMarkIcon className="w-5 h-5" /> : <SpeakerIcon className="w-5 h-5" />}
-            </button>
-        </div>
-    );
-};
-
-const TransformableCharacter: React.FC<{
-    character: Character;
-    rotation: number;
-    position: { x: number, y: number };
-    onRotationChange: (rot: number) => void;
-    onPositionChange: (pos: { x: number, y: number }) => void;
-    isSelected: boolean;
-    onSelect: () => void;
-    containerRef: React.RefObject<HTMLDivElement>;
-}> = ({ character, rotation, position, onRotationChange, onPositionChange, isSelected, onSelect, containerRef }) => {
-    const [isDragging, setIsDragging] = useState(false);
-    const [isRotating, setIsRotating] = useState(false);
-    const startPosRef = useRef({ x: 0, y: 0 });
-    const startRotationRef = useRef(0);
-    const centerRef = useRef({ x: 0, y: 0 }); // Cache center point during rotation
-    const elementRef = useRef<HTMLDivElement>(null);
-
-    const handleMouseDown = (e: React.MouseEvent) => {
-        if (e.button !== 0) return; // Only left click
-        e.stopPropagation();
-        onSelect();
-        setIsDragging(true);
-        startPosRef.current = { x: e.clientX - position.x, y: e.clientY - position.y };
-    };
-
-    const handleRotateMouseDown = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-        setIsRotating(true);
-        if (elementRef.current) {
-             const rect = elementRef.current.getBoundingClientRect();
-             // Calculate center based on the rect at the start of rotation
-             const centerX = rect.left + rect.width / 2;
-             const centerY = rect.top + rect.height / 2;
-             centerRef.current = { x: centerX, y: centerY };
-
-             // Store initial angle relative to current rotation
-             const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-             startRotationRef.current = currentAngle - rotation;
-        }
-    };
-
-    const handleRotateStep = (e: React.MouseEvent, degrees: number) => {
-        e.stopPropagation();
-        onRotationChange(rotation + degrees);
-    };
-
-    const handleManualRotationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = parseInt(e.target.value, 10);
-        if (!isNaN(val)) {
-            onRotationChange(val);
-        }
-    };
-
-    useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            if (isDragging) {
-                const newX = e.clientX - startPosRef.current.x;
-                const newY = e.clientY - startPosRef.current.y;
-                onPositionChange({ x: newX, y: newY });
-            } else if (isRotating) {
-                // Use cached center to prevent jitter as element transform changes
-                const { x: centerX, y: centerY } = centerRef.current;
-                const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-                let newRotation = angle - startRotationRef.current;
-                
-                // Snap to 45 degrees if Shift is held
-                if (e.shiftKey) {
-                    newRotation = Math.round(newRotation / 45) * 45;
-                }
-                
-                onRotationChange(newRotation);
-            }
-        };
-
-        const handleMouseUp = () => {
-            setIsDragging(false);
-            setIsRotating(false);
-        };
-
-        if (isDragging || isRotating) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-        }
-
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isDragging, isRotating, onPositionChange, onRotationChange]);
-
-    return (
-        <div
-            ref={elementRef}
-            style={{
-                transform: `translate(${position.x}px, ${position.y}px) rotate(${rotation}deg)`,
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                cursor: isDragging ? 'grabbing' : 'grab',
-                zIndex: isSelected ? 50 : undefined
-            }}
-            onMouseDown={handleMouseDown}
-            className={`select-none ${isSelected ? 'z-50' : ''}`}
-        >
-            <div className={`relative ${isSelected ? 'ring-2 ring-indigo-500' : ''}`}>
-                <img 
-                    src={character.imageUrl} 
-                    alt={character.name} 
-                    className="w-48 h-auto object-contain pointer-events-none"
-                    draggable={false}
-                />
-                
-                {isSelected && (
-                    <div 
-                        className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-white rounded-full shadow-md cursor-crosshair flex items-center justify-center border border-gray-300 hover:bg-indigo-100"
-                        onMouseDown={handleRotateMouseDown}
-                        title="Drag to rotate (Hold Shift to snap)"
-                    >
-                        <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full"></div>
-                        <div className="absolute h-4 w-0.5 bg-indigo-500 top-full left-1/2 transform -translate-x-1/2"></div>
-                    </div>
-                )}
-                
-                {isSelected && (
-                    <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 pointer-events-auto">
-                        <button 
-                            onClick={(e) => handleRotateStep(e, -45)}
-                            className="bg-gray-800 text-white p-1.5 rounded-full shadow hover:bg-indigo-600 transition-colors border border-gray-600"
-                            title="Rotate Left 45°"
-                        >
-                            <RotateLeftIcon className="w-4 h-4" />
-                        </button>
-                        <button 
-                            onClick={(e) => handleRotateStep(e, 45)}
-                            className="bg-gray-800 text-white p-1.5 rounded-full shadow hover:bg-indigo-600 transition-colors border border-gray-600"
-                            title="Rotate Right 45°"
-                        >
-                            <RotateRightIcon className="w-4 h-4" />
-                        </button>
-                    </div>
-                )}
-
-                {isSelected && (
-                    <div className="absolute top-0 right-0 pointer-events-auto">
-                        <input
-                            type="number"
-                            step={45}
-                            value={Math.round(rotation)}
-                            onChange={handleManualRotationChange}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            className="w-14 bg-indigo-600 text-white text-xs px-1 py-0.5 rounded-bl border-none focus:outline-none focus:ring-1 focus:ring-white text-center font-mono"
-                            title="Rotation angle (step 45°)"
-                        />
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
+);
 
 export const Canvas: React.FC<CanvasProps> = ({ 
-    isLoading, 
-    loadingMessage, 
-    generatedContent, 
-    error, 
-    selectedCharacters, 
-    onCharacterReorder,
-    characterRotations,
-    onRotationChange,
-    characterPositions,
-    onPositionChange
+    isLoading, loadingMessage, generatedContent, activeTool, editorState, error, selectedCharacters, characterRotations, onRotationChange, characterPositions, onPositionChange
 }) => {
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Close modal if content changes
-  useEffect(() => {
-    setShowDownloadModal(false);
-  }, [generatedContent]);
-  
-  // Set initial position to center for newly added characters
-  useEffect(() => {
-    if (containerRef.current) {
-        const { width, height } = containerRef.current.getBoundingClientRect();
-        selectedCharacters.forEach(char => {
-            if (!characterPositions[char.id]) {
-                // Initialize at center roughly (assuming char width 200px)
-                onPositionChange(char.id, { x: width / 2 - 100, y: height / 2 - 100 });
-            }
-        });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCharacters.length]);
-
-  const downloadMedia = (url: string, type: 'video' | 'audio') => {
+  const downloadMedia = (url: string, type: string, index?: number, isWatermarked?: boolean) => {
       const a = document.createElement('a');
       a.href = url;
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      
-      let extension = 'dat';
-      if (type === 'video') extension = 'mp4';
-      if (type === 'audio') extension = 'wav';
-      
-      a.download = `character-studio-${type}-${timestamp}.${extension}`;
+      const tag = isWatermarked ? '-watermark' : '-primary';
+      a.download = `${type}${index !== undefined ? `-${index}` : ''}${tag}-${timestamp}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
   };
 
+  const handleDownloadBatch = () => {
+    if (generatedContent?.urls) {
+        generatedContent.urls.forEach((url, i) => {
+            const isWM = i % 2 !== 0;
+            const indexLabel = Math.floor(i/2) + 1;
+            // Delay slightly to prevent browser blocking multiple downloads
+            setTimeout(() => downloadMedia(url, 'output', indexLabel, isWM), i * 350);
+        });
+    }
+  };
+
   const renderContent = () => {
-    if (isLoading) {
-      return <Loader message={loadingMessage} />;
-    }
-    if (error) {
-      return (
-        <div className="text-center text-red-400 bg-red-900/50 p-6 rounded-lg">
-          <h3 className="font-bold text-lg mb-2">An Error Occurred</h3>
-          <p>{error}</p>
+    if (isLoading) return <Loader message={loadingMessage} />;
+    if (error) return (
+        <div className="text-center text-red-400 p-8 border border-red-900/50 rounded-xl bg-red-900/10 backdrop-blur-md">
+            <h3 className="font-bold mb-2">Error Encountered</h3>
+            <p className="text-sm opacity-80 mb-6">{error}</p>
+            <Button onClick={() => window.location.reload()} variant="secondary" className="px-8 text-xs">Reset Workspace</Button>
         </div>
-      );
-    }
-    if (generatedContent) {
-      if (generatedContent.type === 'image') {
+    );
+
+    if (generatedContent?.type === 'batch' && generatedContent.urls) {
+        const count = generatedContent.urls.length;
         return (
-          <div className="relative group max-w-full max-h-full flex flex-col items-center" key={generatedContent.url}>
-            {generatedContent.soundEffectUrl && <AudioPlayer url={generatedContent.soundEffectUrl} />}
-            <img src={generatedContent.url} alt="Generated content" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
-            <button 
-                onClick={() => setShowDownloadModal(true)}
-                className="absolute top-4 right-4 bg-gray-900/80 hover:bg-indigo-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-2 group-hover:translate-y-0"
-                title="Download Options"
-            >
-                <DownloadIcon className="w-6 h-6" />
-            </button>
-          </div>
-        );
-      }
-      if (generatedContent.type === 'video') {
-        return (
-          <div className="relative group max-w-full max-h-full flex flex-col items-center" key={generatedContent.url}>
-             <video src={generatedContent.url} controls autoPlay loop className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
-             <button 
-                onClick={() => downloadMedia(generatedContent.url, 'video')}
-                className="absolute top-4 right-4 bg-gray-900/80 hover:bg-indigo-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg transform translate-y-2 group-hover:translate-y-0 z-10"
-                title="Download Video"
-            >
-                <DownloadIcon className="w-6 h-6" />
-            </button>
-          </div>
-        );
-      }
-      if (generatedContent.type === 'audio') {
-          const character = selectedCharacters.find(c => c.id === generatedContent.characterId) || selectedCharacters[0];
-          return (
-              <div className="flex flex-col items-center gap-6 bg-gray-800/80 p-8 rounded-xl border border-gray-700 backdrop-blur-sm max-w-lg w-full relative" key={generatedContent.url}>
-                  <div className="relative w-48 h-48 rounded-full overflow-hidden border-4 border-indigo-500 shadow-xl">
-                      {character ? (
-                          <img src={character.imageUrl} alt={character.name} className="w-full h-full object-cover" />
-                      ) : (
-                          <div className="w-full h-full bg-gray-700 flex items-center justify-center">
-                              <MicrophoneIcon className="w-16 h-16 text-gray-500" />
-                          </div>
-                      )}
-                  </div>
-                  <div className="text-center">
-                    <h3 className="text-xl font-bold text-white mb-1">{character?.name || 'Unknown Character'}</h3>
-                    <p className="text-sm text-gray-400">Generated Voice Audio</p>
-                  </div>
-                  <div className="w-full flex items-center gap-2">
-                    <audio src={generatedContent.url} controls autoPlay className="w-full" />
-                    <button 
-                        onClick={() => downloadMedia(generatedContent.url, 'audio')}
-                        className="bg-gray-700 hover:bg-indigo-600 text-white p-2.5 rounded-full transition-colors"
-                        title="Download Audio"
-                    >
-                        <DownloadIcon className="w-5 h-5" />
-                    </button>
-                  </div>
-              </div>
-          )
-      }
-    }
-    
-    // Default: Interactive Stage
-    if (selectedCharacters.length > 0) {
-        return (
-            <div 
-                ref={containerRef}
-                className="w-full h-full relative overflow-hidden bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-700"
-                onClick={() => setSelectedId(null)}
-            >
-                <div className="absolute top-4 left-4 text-gray-500 pointer-events-none z-0">
-                    <p className="text-sm font-medium">Composition Stage</p>
-                    <p className="text-xs">Drag to move, use handle to rotate.</p>
+            <div className="flex flex-col items-center w-full h-full max-w-6xl p-6 overflow-hidden animate-in fade-in duration-500">
+                <div className="flex justify-between items-end w-full mb-8">
+                    <div className="space-y-1">
+                        <h3 className="text-2xl font-black text-emerald-400 flex items-center gap-3 uppercase tracking-tighter">
+                            <SparklesIcon className="w-8 h-8" /> Generation Batch
+                        </h3>
+                        <p className="text-xs text-gray-500 font-medium">Pairs of high-resolution Primary and Watermarked scene variations.</p>
+                    </div>
+                    <Button onClick={handleDownloadBatch} className="bg-emerald-600 hover:bg-emerald-500 text-xs px-10 h-12 shadow-2xl shadow-emerald-900/40 transform hover:scale-105 transition-all">
+                        <DownloadIcon className="w-5 h-5" /> Download All ({count}) PNGs
+                    </Button>
                 </div>
-                {selectedCharacters.map(char => (
-                    <TransformableCharacter 
-                        key={char.id}
-                        character={char}
-                        rotation={characterRotations[char.id] || 0}
-                        position={characterPositions[char.id] || {x: 0, y: 0}}
-                        onRotationChange={(rot) => onRotationChange(char.id, rot)}
-                        onPositionChange={(pos) => onPositionChange(char.id, pos)}
-                        isSelected={selectedId === char.id}
-                        onSelect={() => setSelectedId(char.id)}
-                        containerRef={containerRef}
-                    />
-                ))}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar flex-grow pb-16 pr-2">
+                    {generatedContent.urls.map((url, i) => {
+                        const isWM = i % 2 !== 0;
+                        const pairIndex = Math.floor(i/2) + 1;
+                        return (
+                            <div key={i} className={`relative group bg-gray-800 rounded-xl overflow-hidden border-2 shadow-2xl transition-all ${isWM ? 'border-indigo-500/30' : 'border-white/5'}`}>
+                                <img src={url} className="w-full h-auto aspect-square object-cover" loading="lazy" />
+                                <div className={`absolute top-3 left-3 px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest backdrop-blur-md shadow-xl ${isWM ? 'bg-indigo-600/80 text-white' : 'bg-black/60 text-gray-300'}`}>
+                                    {isWM ? 'Watermarked' : `Primary ${pairIndex}`}
+                                </div>
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <button 
+                                        onClick={() => downloadMedia(url, 'output', pairIndex, isWM)} 
+                                        className="bg-white text-gray-900 p-3 rounded-full shadow-2xl transform scale-90 hover:scale-110 transition-transform"
+                                        title="Download PNG"
+                                    >
+                                        <DownloadIcon className="w-6 h-6" />
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
-        )
+        );
+    }
+
+    if (activeTool === 'IMAGE_EDITOR' && editorState.workingImage) {
+        return (
+          <div className="relative group max-w-full max-h-full flex flex-col items-center animate-in fade-in zoom-in-95 duration-500">
+            <img src={editorState.workingImage} className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl border border-white/5" />
+            <div className="absolute top-4 left-4 bg-indigo-600/90 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-xl ring-1 ring-white/20">Canvas Output</div>
+            <button onClick={() => downloadMedia(editorState.workingImage!, 'edit')} className="absolute top-4 right-4 bg-gray-900/90 hover:bg-indigo-600 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-xl backdrop-blur-md">
+                <DownloadIcon className="w-6 h-6" />
+            </button>
+          </div>
+        );
+    }
+
+    if (generatedContent) {
+        const { type, url } = generatedContent;
+        if (type === 'audio') return (
+            <div className="flex flex-col items-center gap-8 bg-gray-800/40 p-12 rounded-3xl border border-white/5 backdrop-blur-3xl shadow-2xl animate-in slide-in-from-bottom-8 duration-700">
+                <div className="w-56 h-56 rounded-3xl overflow-hidden border-2 border-indigo-500/30 bg-gray-900 flex flex-col items-center justify-center gap-4 shadow-inner">
+                    <MicrophoneIcon className="w-20 h-20 text-indigo-400 opacity-50" />
+                    <AudioPulse />
+                    <p className="text-white font-black text-xs uppercase tracking-widest">Voice Synthesis</p>
+                </div>
+                <div className="flex items-center gap-4 w-full max-w-md">
+                    <audio src={url} controls autoPlay className="flex-grow accent-indigo-500" />
+                    <button onClick={() => downloadMedia(url, 'audio')} className="bg-indigo-600 hover:bg-indigo-500 text-white p-4 rounded-2xl shadow-lg transition-all hover:scale-105">
+                        <DownloadIcon className="w-6 h-6" />
+                    </button>
+                </div>
+            </div>
+        );
+        return (
+            <div className="relative group max-w-full max-h-full flex flex-col items-center animate-in fade-in duration-500">
+                {type === 'video' ? (
+                    <video src={url} controls autoPlay loop className="max-w-full max-h-full rounded-2xl shadow-2xl border border-white/5" />
+                ) : (
+                    <img src={url} className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl border border-white/5" />
+                )}
+                <button onClick={() => downloadMedia(url, type)} className="absolute top-4 right-4 bg-gray-900/90 hover:bg-indigo-600 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-xl">
+                    <DownloadIcon className="w-6 h-6" />
+                </button>
+            </div>
+        );
     }
 
     return (
-      <div className="text-center text-gray-500 flex flex-col items-center gap-4">
-        <SceneIcon className="w-24 h-24 text-gray-700" />
-        <h2 className="text-2xl font-bold">Your Scene Awaits</h2>
-        <p>Select characters from the library to start building.</p>
+      <div className="text-center text-gray-700 flex flex-col items-center gap-8 animate-in fade-in duration-1000">
+        <div className="relative">
+            <SceneIcon className="w-40 h-40 opacity-10" />
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent"></div>
+        </div>
+        <div className="space-y-2">
+            <h2 className="text-4xl font-black opacity-20 uppercase tracking-tighter">Studio Empty</h2>
+            <p className="text-sm opacity-30 font-medium tracking-wide">Compose a scene or generate mockups to begin.</p>
+        </div>
       </div>
     );
   };
 
   return (
-    <main className="relative flex-grow p-6 flex items-center justify-center bg-gray-900/70">
-      <div className="w-full h-full flex items-center justify-center">
+    <main className="relative flex-grow min-w-0 p-10 flex items-center justify-center bg-gray-900/95 overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#4f46e5_0.5px,transparent_0.5px)] [background-size:32px_32px]"></div>
+      <div className="w-full h-full flex items-center justify-center relative z-10">
         {renderContent()}
       </div>
-      <LayerManager characters={selectedCharacters} onReorder={onCharacterReorder} />
-      {showDownloadModal && generatedContent?.type === 'image' && (
-        <ImageDownloadModal 
-            imageUrl={generatedContent.url} 
-            onClose={() => setShowDownloadModal(false)} 
-        />
-      )}
     </main>
   );
 };

@@ -3,13 +3,57 @@ import React from 'react';
 
 export const MODEL_NAMES = {
   IMAGE_GENERATION: 'imagen-4.0-generate-001',
-  IMAGE_EDITING: 'gemini-2.5-flash-image',
+  // Upgraded to Pro for high-resolution batch requirements
+  IMAGE_EDITING: 'gemini-3-pro-image-preview',
   VIDEO_GENERATION: 'veo-3.1-fast-generate-preview',
-  DESCRIPTION_GENERATION: 'gemini-2.5-flash',
+  DESCRIPTION_GENERATION: 'gemini-3-flash-preview',
   TTS: 'gemini-2.5-flash-preview-tts',
+  ANALYSIS: 'gemini-3-flash-preview',
 };
 
 export const VOICE_NAMES = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
+
+export const CHARACTER_STYLES = [
+  { name: 'Warm Minimalism', description: 'Soft earth tones (terracotta, ochre), natural textures, calm and homely atmosphere.' },
+  { name: 'Naive Art & Authenticity', description: 'Hand-drawn sketches, rough lines, intentional imperfections, anti-perfectionist aesthetic.' },
+  { name: 'Dreamcore & Surrealism', description: 'Dreamlike, bizarre, subconscious imagery with soft transitions and surreal compositions.' },
+  { name: 'Authentically Artificial', description: 'Emphasized AI aesthetics, glitch effects, artificial textures, intentionally non-realistic.' },
+  { name: 'Cyberpunk & Neon', description: 'Dark futuristic cityscapes, neon lights, high contrast, tech-driven atmosphere.' },
+  { name: 'Botanical & Floral Pop', description: 'Intense colors, modern nature motifs, dynamic floral compositions.' },
+  { name: 'Retro-Futurism & Digital Vintage', description: '1970s-inspired color palettes mixed with modern digital elements, nostalgic-futuristic look.' },
+  { name: 'Memorycore & Collage', description: 'Archive-like collage aesthetics, paper textures, handwritten notes, intimate storytelling.' },
+  { name: 'Abstract Neutrals', description: 'Abstract shapes, neutral color palettes, calm large-scale compositions.' },
+  { name: 'Hyperreal Dreamscapes', description: 'Real scenes enhanced with magical depth, atmospheric and dreamlike.' },
+  { name: 'American Superhero Style', description: 'Exaggerated anatomy, dynamic action poses, strong primary colors, complex panel-like composition.' },
+  { name: 'Manga', description: 'Large expressive eyes, speed lines, screentone textures, often black-and-white.' },
+  { name: 'Ligne Claire', description: 'Clean uniform outlines, no shading, flat colors, simplified but realistic clarity.' },
+  { name: 'Authentic & Unfiltered', description: 'Spontaneous emotions, natural lighting, unposed moments, minimal editing.' },
+  { name: 'Cinematic Photography', description: 'Film-like lighting, rich colors, widescreen framing, strong narrative atmosphere.' },
+  { name: 'Modern Analog & Film Grain', description: 'Analog film look with visible grain, slight color shifts, lens flares, nostalgic tactile quality.' }
+];
+
+export const STYLE_ENGINE = {
+  styles: [
+    { id: 'cinematic-sports', label: 'Cinematic Sports Film Look', parameters: { contrast: 1.4, saturation: 1.1, lightingMood: 'dramatic stadium lighting', grain: 0.2, skinToneProtection: true, description: 'Anamorphic lens flares and intense atmospheric depth' } },
+    { id: 'high-contrast-bw', label: 'High-Contrast Black & White', parameters: { monochrome: true, contrast: 1.8, clarity: 1.5, lightingMood: 'classic noir shadows', skinToneProtection: true, description: 'Deep shadows and sharp highlights' } },
+    { id: 'neon-night', label: 'Neon Night / Stadium Lights', parameters: { contrast: 1.2, saturation: 1.6, lightingMood: 'vibrant neon stadium glow', bloom: 0.8, description: 'Vibrant blues and pinks with volumetric lighting' } },
+    { id: 'slow-motion', label: 'Slow Motion Action Freeze', parameters: { clarity: 1.3, shutterEffect: 'cinematic freeze-frame', motionBlurEdges: true, description: 'Sharp frozen center with slight edge motion' } },
+    { id: 'gritty-street', label: 'Gritty Street Football Look', parameters: { contrast: 1.5, saturation: 0.8, grain: 0.5, textureEmphasis: 'urban rough', description: 'Urban textures and desaturated raw atmosphere' } },
+    { id: 'teal-orange', label: 'Teal & Orange Cinema Grade', parameters: { colorGrade: 'teal and orange', contrast: 1.2, skinToneProtection: true, description: 'Professional cinema grade with warm highlights' } },
+    { id: 'eye-focus', label: 'Ultra-Realistic Eye Focus', parameters: { focusMode: 'intense eye focus', microTexture: 1.5, depthOfField: 'shallow', skinToneProtection: true, description: 'Micro-detail skin textures and professional lighting' } },
+    { id: 'glitch', label: 'Glitch / Beat-Synced Visual Style', parameters: { glitchEffect: 0.7, chromaticAberration: true, saturation: 1.4, description: 'Digital artifacts and rhythmic color shifts' } },
+    { id: 'hero-shot', label: 'Minimal Clean Hero Shot', parameters: { lightingMood: 'clean studio lighting', contrast: 1.1, softShadows: true, description: 'Commercial photography aesthetic' } },
+    { id: 'epic-comeback', label: 'Epic Comeback Look', parameters: { lightingMood: 'heroic backlighting', contrast: 1.6, weatherEffects: 'sweat and rain', description: 'Triumphant atmosphere with heavy shadows' } }
+  ],
+  defaultOutput: {
+    formats: ['PNG', 'JPG'],
+    qualityLevels: [
+      { id: 'low', label: 'Low', description: 'Social Media Optimized', jpgQuality: 0.5, pngCompression: 0.4 },
+      { id: 'medium', label: 'Medium', description: 'Balanced Quality', jpgQuality: 0.8, pngCompression: 0.7 },
+      { id: 'high', label: 'High', description: 'Maximum Fidelity', jpgQuality: 1.0, pngCompression: 1.0 }
+    ]
+  }
+};
 
 export const AddUserIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
@@ -123,6 +167,12 @@ export const PhotoIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09-3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+  </svg>
+);
+
+export const CodeBracketIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
   </svg>
 );
